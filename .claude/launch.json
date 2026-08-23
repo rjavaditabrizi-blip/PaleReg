@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "streamlit",
+      "runtimeExecutable": "/Users/rezajavadi-tabrizi/symbolic-alpha/.venv/bin/streamlit",
+      "runtimeArgs": ["run", "app.py", "--server.port", "8765", "--server.headless", "true"],
+      "port": 8765
+    }
+  ]
+}

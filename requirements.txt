@@ -1,0 +1,12 @@
+numpy
+pandas
+pyarrow
+scikit-learn
+scipy
+gplearn
+yfinance
+lxml
+matplotlib
+streamlit
+requests
+pysr

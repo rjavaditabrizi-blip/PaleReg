@@ -1,0 +1,50 @@
+[
+  {
+    "index": 0,
+    "formula": "neg(delta_close_5)",
+    "train_ic": 0.012652873706522419,
+    "test_ic": NaN,
+    "train_rank_ic": 0.01603078172401184,
+    "test_rank_ic": NaN
+  },
+  {
+    "index": 1,
+    "formula": "sub(sub(sum_volume_10, delta_close_5), delta_close_5)",
+    "train_ic": 0.01992372564516172,
+    "test_ic": NaN,
+    "train_rank_ic": 0.018971732818466945,
+    "test_rank_ic": NaN
+  },
+  {
+    "index": 2,
+    "formula": "sub(sum_volume_10, delta_close_5)",
+    "train_ic": 0.022567795753275673,
+    "test_ic": NaN,
+    "train_rank_ic": 0.01861432474778906,
+    "test_rank_ic": NaN
+  },
+  {
+    "index": 3,
+    "formula": "sub(mean_close_10, vwap)",
+    "train_ic": 0.015689721920863337,
+    "test_ic": NaN,
+    "train_rank_ic": 0.021915816777202488,
+    "test_rank_ic": NaN
+  },
+  {
+    "index": 4,
+    "formula": "add(add(sum_volume_10, neg(delta_close_5)), neg(delta_close_5))",
+    "train_ic": 0.01992372564516172,
+    "test_ic": NaN,
+    "train_rank_ic": 0.018971732818466945,
+    "test_rank_ic": NaN
+  },
+  {
+    "index": 5,
+    "formula": "add(sum_volume_10, neg(delta_close_5))",
+    "train_ic": 0.022567795753275673,
+    "test_ic": NaN,
+    "train_rank_ic": 0.01861432474778906,
+    "test_rank_ic": NaN
+  }
+]

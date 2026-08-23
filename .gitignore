@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+data/*.parquet
+data/*.csv
+results/*.npz
+results/*.pkl
+results/*.parquet
+results/*.csv
+results/*.png
+.DS_Store
