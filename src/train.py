@@ -28,6 +28,7 @@ import numpy as np
 import pandas as pd
 from gplearn.genetic import SymbolicTransformer
 
+from .engines.pysr_engine import mine_pool_pysr_multiseed
 from .fitness import make_ic_fitness, make_rank_ic_fitness, mean_ic, mean_rank_ic
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -121,6 +122,18 @@ def mine_pool(X_train, X_test, y_train, dates_train, feature_cols, args, verbose
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--engine", choices=["gplearn", "pysr"], default="gplearn")
+    # pysr-specific (validated as the production engine via walkforward.py: 3-seed
+    # day-aware-batched PySR beat gplearn on every metric -- Sharpe +0.29 vs +0.21
+    # with lower variance, IC +0.0218 vs +0.0206, both at 100% fold hit-rate)
+    parser.add_argument("--pysr-n-seeds", type=int, default=3)
+    parser.add_argument("--pysr-niterations", type=int, default=20)
+    parser.add_argument("--pysr-populations", type=int, default=8)
+    parser.add_argument("--pysr-population-size", type=int, default=33)
+    parser.add_argument("--pysr-maxsize", type=int, default=20)
+    parser.add_argument("--pysr-procs", type=int, default=8)
+    parser.add_argument("--pysr-batch-days", type=int, default=60)
+    # gplearn-specific
     parser.add_argument("--population", type=int, default=500, help="Population size PER SEED")
     parser.add_argument("--generations", type=int, default=25, help="Generations PER SEED")
     parser.add_argument("--n-components", type=int, default=5, help="Diverse formulas kept PER SEED")
@@ -181,9 +194,22 @@ def main():
     sectors_test = test_df["sector"].values
     raw_y_test = test_df["fwd_ret"].values
 
-    pool_train, pool_test, deduped_formulas, programs = mine_pool(
-        X_train, X_test, y_train, dates_train, feature_cols, args
-    )
+    if args.engine == "gplearn":
+        pool_train, pool_test, deduped_formulas, programs = mine_pool(
+            X_train, X_test, y_train, dates_train, feature_cols, args
+        )
+    else:
+        pool_train, pool_test, deduped_formulas, programs, y_train, dates_train = mine_pool_pysr_multiseed(
+            X_train, X_test, y_train, dates_train, feature_cols,
+            n_seeds=args.pysr_n_seeds,
+            seed=args.seed,
+            niterations=args.pysr_niterations,
+            populations=args.pysr_populations,
+            population_size=args.pysr_population_size,
+            maxsize=args.pysr_maxsize,
+            procs=args.pysr_procs,
+            batch_days=args.pysr_batch_days,
+        )
 
     formulas = []
     print("\nMined factors (deduped):")

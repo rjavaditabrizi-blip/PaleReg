@@ -29,6 +29,7 @@ import pandas as pd
 
 from .backtest import decile_backtest, ic_weighted_backtest
 from .combine import static_combine
+from .engines.pysr_engine import mine_pool_pysr_multiseed
 from .features import HORIZON
 from .fitness import mean_rank_ic
 from .train import mine_pool
@@ -38,8 +39,6 @@ METHODS = {"decile": decile_backtest, "ic_weighted": ic_weighted_backtest}
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 FEATURES_CACHE = DATA_DIR / "features.parquet"
-WF_RESULTS_CACHE = RESULTS_DIR / "walkforward_results.json"
-OOS_PREDICTIONS_CACHE = RESULTS_DIR / "oos_predictions.parquet"
 
 
 def make_folds(unique_dates: np.ndarray, n_folds: int, min_train_frac: float):
@@ -61,6 +60,9 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--n-folds", type=int, default=5)
     parser.add_argument("--min-train-frac", type=float, default=0.4, help="Minimum initial training history, as a fraction of total dates")
+    parser.add_argument("--engine", choices=["gplearn", "pysr"], default="gplearn")
+    parser.add_argument("--tag", default=None, help="Output filename suffix. Defaults to '' for gplearn, '_pysr' for pysr, so a pysr run can't silently overwrite the validated gplearn baseline the UI reads.")
+    # gplearn-specific
     parser.add_argument("--n-seeds", type=int, default=4)
     parser.add_argument("--population", type=int, default=300)
     parser.add_argument("--generations", type=int, default=15)
@@ -74,6 +76,15 @@ def main():
     parser.add_argument("--p-point-mutation", type=float, default=0.1)
     parser.add_argument("--metric", choices=["pearson", "spearman"], default="spearman")
     parser.add_argument("--n-jobs", type=int, default=-1)
+    # pysr-specific
+    parser.add_argument("--pysr-niterations", type=int, default=30)
+    parser.add_argument("--pysr-populations", type=int, default=10)
+    parser.add_argument("--pysr-population-size", type=int, default=30)
+    parser.add_argument("--pysr-maxsize", type=int, default=20)
+    parser.add_argument("--pysr-procs", type=int, default=4)
+    parser.add_argument("--pysr-batch-days", type=int, default=60, help="Whole trading days sampled fresh per loss evaluation (see pysr_engine.py)")
+    parser.add_argument("--pysr-n-seeds", type=int, default=1, help="Independent PySR searches to pool together (mirrors gplearn's --n-seeds)")
+    # shared
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--alpha", type=float, default=1e-4, help="Lasso regularization strength")
     parser.add_argument(
@@ -87,6 +98,10 @@ def main():
     parser.add_argument("--n-buckets", type=int, default=10)
     parser.add_argument("--cost-bps", type=float, default=5.0)
     args = parser.parse_args()
+
+    tag = args.tag if args.tag is not None else ("" if args.engine == "gplearn" else f"_{args.engine}")
+    wf_results_cache = RESULTS_DIR / f"walkforward_results{tag}.json"
+    oos_predictions_cache = RESULTS_DIR / f"oos_predictions{tag}.parquet"
 
     df = pd.read_parquet(FEATURES_CACHE)
     feature_cols = [
@@ -119,9 +134,23 @@ def main():
         sectors_test = test_df["sector"].values
         raw_y_test = test_df["fwd_ret"].values
 
-        pool_train, pool_test, formulas, _programs = mine_pool(
-            X_train, X_test, y_train, dates_train, feature_cols, args, verbose=False
-        )
+        if args.engine == "gplearn":
+            pool_train, pool_test, formulas, _models = mine_pool(
+                X_train, X_test, y_train, dates_train, feature_cols, args, verbose=False
+            )
+        else:
+            pool_train, pool_test, formulas, _models, y_train, dates_train = mine_pool_pysr_multiseed(
+                X_train, X_test, y_train, dates_train, feature_cols,
+                n_seeds=args.pysr_n_seeds,
+                seed=args.seed,
+                verbose=False,
+                niterations=args.pysr_niterations,
+                populations=args.pysr_populations,
+                population_size=args.pysr_population_size,
+                maxsize=args.pysr_maxsize,
+                procs=args.pysr_procs,
+                batch_days=args.pysr_batch_days,
+            )
         n_unique = len(formulas)
 
         weights, train_ic, test_ic, test_pred = static_combine(
@@ -177,12 +206,12 @@ def main():
     print(f"Rank IC:     mean={rank_ics.mean():+.4f}  std={rank_ics.std(ddof=0):.4f}  hit_rate(>0)={np.mean(rank_ics > 0):.0%}")
 
     RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    with open(WF_RESULTS_CACHE, "w") as f:
+    with open(wf_results_cache, "w") as f:
         json.dump(fold_results, f, indent=2, default=str)
-    print(f"\nSaved per-fold results -> {WF_RESULTS_CACHE}")
+    print(f"\nSaved per-fold results -> {wf_results_cache}")
 
-    pd.concat(all_oos, ignore_index=True).to_parquet(OOS_PREDICTIONS_CACHE, index=False)
-    print(f"Saved pooled out-of-sample predictions -> {OOS_PREDICTIONS_CACHE}")
+    pd.concat(all_oos, ignore_index=True).to_parquet(oos_predictions_cache, index=False)
+    print(f"Saved pooled out-of-sample predictions -> {oos_predictions_cache}")
 
 
 if __name__ == "__main__":
