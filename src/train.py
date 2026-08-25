@@ -161,9 +161,12 @@ def main():
     parser.add_argument(
         "--target",
         choices=["raw", "neutral"],
-        default="neutral",
-        help="fwd_ret (raw) or fwd_ret_neutral (sector-demeaned). Mining against the "
-        "neutral target rewards stock-level selection skill instead of sector timing.",
+        default="raw",
+        help="fwd_ret (raw, default) or fwd_ret_neutral (sector-demeaned). Walk-forward "
+        "validation showed 'neutral' gutted the signal (mean IC +0.0206 -> +0.0066) because "
+        "part of the real edge is a volume/attention effect that's inherently sector-correlated "
+        "-- sector risk should be capped at the portfolio-construction step instead (see "
+        "predict_today.py --max-per-sector), not baked into the mining target.",
     )
     parser.add_argument("--n-jobs", type=int, default=-1)
     parser.add_argument("--seed", type=int, default=42, help="Base seed; seeds used are seed, seed+1, ...")

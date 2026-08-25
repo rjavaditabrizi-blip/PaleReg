@@ -90,8 +90,9 @@ def main():
     parser.add_argument(
         "--target",
         choices=["raw", "neutral"],
-        default="neutral",
-        help="fwd_ret (raw) or fwd_ret_neutral (sector-demeaned) for mining + IC. Backtest P&L always uses raw fwd_ret.",
+        default="raw",
+        help="fwd_ret (raw, default) or fwd_ret_neutral (sector-demeaned) for mining + IC. "
+        "'neutral' validated worse (see train.py --target help) -- kept as an option, not default.",
     )
     parser.add_argument("--method", choices=list(METHODS), default="decile")
     parser.add_argument("--sector-neutral", action="store_true", help="Form the backtest portfolio within each GICS sector")

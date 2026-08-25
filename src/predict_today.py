@@ -41,7 +41,7 @@ def load_model():
     if not PROGRAMS_CACHE.exists():
         raise SystemExit(
             f"{PROGRAMS_CACHE} not found. Run a production mining pass first, e.g.:\n"
-            "  python -m src.train --test-frac 0 --target neutral ...\n"
+            "  python -m src.train --test-frac 0 ...\n"
             "  python -m src.combine --mode static"
         )
     with open(PROGRAMS_CACHE, "rb") as f:
@@ -68,12 +68,37 @@ def score_universe(df_today: pd.DataFrame, feature_cols, programs, weights) -> p
     return df_today
 
 
+def select_diversified(ranked: pd.DataFrame, top_n: int, max_per_sector: int | None = None) -> pd.DataFrame:
+    """Take the top-n rows of an already-priority-sorted DataFrame, optionally
+    skipping any row that would push its sector's count above max_per_sector.
+
+    This is the risk-control step, applied *after* scoring rather than baked
+    into the mining target -- walk-forward validation showed sector-
+    neutralizing the mining target gutted the signal (a real part of the
+    edge is a volume/attention effect that's inherently sector-correlated).
+    Capping sector concentration in the final picks gets the diversification
+    benefit without touching what the model is actually allowed to find."""
+    if not max_per_sector:
+        return ranked.head(top_n)
+    picked_idx, sector_counts = [], {}
+    for idx, row in ranked.iterrows():
+        if len(picked_idx) >= top_n:
+            break
+        sector = row["sector"]
+        if sector_counts.get(sector, 0) >= max_per_sector:
+            continue
+        picked_idx.append(idx)
+        sector_counts[sector] = sector_counts.get(sector, 0) + 1
+    return ranked.loc[picked_idx]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--top", type=int, default=15, help="How many long/short candidates to show")
     parser.add_argument("--period", default="8mo", help="How much recent history to pull (needs to cover mom_60 + rolling windows + warmup)")
     parser.add_argument("--refresh-tickers", action="store_true")
     parser.add_argument("--provider", default="yfinance", help="Data source name (see src/providers)")
+    parser.add_argument("--max-per-sector", type=int, default=None, help="Cap picks per GICS sector, e.g. 3 -- applied after scoring, doesn't change the model")
     args = parser.parse_args()
 
     programs, feature_cols, weights, formulas = load_model()
@@ -94,13 +119,16 @@ def main():
     print(f"Scoring {len(df_today)} stocks as of {latest_date.date()}")
 
     scored = score_universe(df_today, feature_cols, programs, weights)
-    scored = scored.sort_values("alpha", ascending=False)
 
-    print(f"\n{'=' * 60}\nTop {args.top} (long candidates)\n{'=' * 60}")
-    print(scored[["ticker", "sector", "alpha"]].head(args.top).to_string(index=False))
+    longs = select_diversified(scored.sort_values("alpha", ascending=False), args.top, args.max_per_sector)
+    shorts = select_diversified(scored.sort_values("alpha", ascending=True), args.top, args.max_per_sector)
 
-    print(f"\n{'=' * 60}\nBottom {args.top} (short candidates)\n{'=' * 60}")
-    print(scored[["ticker", "sector", "alpha"]].tail(args.top).to_string(index=False))
+    cap_note = f" (max {args.max_per_sector}/sector)" if args.max_per_sector else ""
+    print(f"\n{'=' * 60}\nTop {args.top} (long candidates){cap_note}\n{'=' * 60}")
+    print(longs[["ticker", "sector", "alpha"]].to_string(index=False))
+
+    print(f"\n{'=' * 60}\nBottom {args.top} (short candidates){cap_note}\n{'=' * 60}")
+    print(shorts[["ticker", "sector", "alpha"]].to_string(index=False))
 
     print(
         "\nNOTE: this is a research signal (validated mean IC ~ +0.02, a portfolio-level "

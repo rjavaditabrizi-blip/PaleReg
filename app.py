@@ -18,7 +18,7 @@ import streamlit as st
 
 from src.explain import breakdown_program, render_tree_lines
 from src.features import compute_live_features
-from src.predict_today import load_model, score_universe
+from src.predict_today import load_model, score_universe, select_diversified
 from src.providers import get_provider
 
 RESULTS_DIR = Path(__file__).resolve().parent / "results"
@@ -72,13 +72,20 @@ tab_picks, tab_performance, tab_factors = st.tabs(["Today's Picks", "Validated P
 with tab_picks:
     st.subheader("Generate today's cross-sectional ranking")
 
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
         provider_name = st.selectbox("Data provider", ["yfinance"], help="See src/providers for adding more sources")
     with col2:
         period = st.text_input("History window to pull", value="8mo", help="Needs to cover the longest lookback (60d momentum) plus warmup")
     with col3:
         top_n = st.slider("Top/bottom N to show", 5, 30, 15)
+    with col4:
+        max_per_sector = st.slider(
+            "Max picks per sector", 0, 15, 0,
+            help="0 = no cap. The model itself isn't sector-diversified (a real part of its edge "
+            "is a volume/attention effect that's inherently sector-correlated) -- this caps "
+            "concentration in the final picks without changing what the model is allowed to find.",
+        )
 
     if st.button("Generate picks", type="primary"):
         try:
@@ -109,20 +116,24 @@ with tab_picks:
 
         st.success(f"Scored {len(scored)} stocks as of {latest_date.date()}")
 
+        cap = max_per_sector or None
+        longs = select_diversified(scored.sort_values("alpha", ascending=False), top_n, cap)
+        shorts = select_diversified(scored.sort_values("alpha", ascending=True), top_n, cap)
+
         c1, c2 = st.columns(2)
         with c1:
             st.markdown(f"**Top {top_n} (long candidates)**")
-            st.dataframe(scored[["ticker", "sector", "alpha"]].head(top_n), hide_index=True, width="stretch")
+            st.dataframe(longs[["ticker", "sector", "alpha"]], hide_index=True, width="stretch")
         with c2:
             st.markdown(f"**Bottom {top_n} (short candidates)**")
-            st.dataframe(scored[["ticker", "sector", "alpha"]].tail(top_n), hide_index=True, width="stretch")
+            st.dataframe(shorts[["ticker", "sector", "alpha"]], hide_index=True, width="stretch")
 
         st.markdown("**Sector distribution of long candidates**")
-        st.bar_chart(scored.head(top_n)["sector"].value_counts())
+        st.bar_chart(longs["sector"].value_counts())
 
         st.divider()
         st.markdown("### Why did it pick that? (formula breakdown)")
-        candidates = pd.concat([scored.head(top_n), scored.tail(top_n)])["ticker"].tolist()
+        candidates = pd.concat([longs, shorts])["ticker"].tolist()
         picked_ticker = st.selectbox("Inspect a candidate", candidates)
 
         if picked_ticker:
