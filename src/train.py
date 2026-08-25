@@ -30,6 +30,7 @@ from gplearn.genetic import SymbolicTransformer
 
 from .engines.pysr_engine import mine_pool_pysr_multiseed
 from .fitness import make_ic_fitness, make_rank_ic_fitness, mean_ic, mean_rank_ic
+from .preflight import resolve_feature_subset
 
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
@@ -169,6 +170,14 @@ def main():
         "predict_today.py --max-per-sector), not baked into the mining target.",
     )
     parser.add_argument("--n-jobs", type=int, default=-1)
+    parser.add_argument(
+        "--feature-subset", default=None,
+        help="'preflight' to use the last `python -m src.preflight --top-n N` recommendation, "
+        "or a comma-separated feature list. Default: use all features. This is a "
+        "prioritization from cheap baselines, not a validated exclusion -- some of SR's best "
+        "mined formulas use features that scored low standalone, so only restrict when you "
+        "specifically want a faster, narrower search.",
+    )
     parser.add_argument("--seed", type=int, default=42, help="Base seed; seeds used are seed, seed+1, ...")
     args = parser.parse_args()
 
@@ -178,6 +187,7 @@ def main():
         for c in df.columns
         if c not in {"date", "ticker", "sector", "open", "high", "low", "close", "volume", "fwd_ret", "fwd_ret_neutral"}
     ]
+    feature_cols = resolve_feature_subset(args.feature_subset, feature_cols)
     target_col = "fwd_ret" if args.target == "raw" else "fwd_ret_neutral"
 
     train_df, test_df, cutoff = time_split(df, args.test_frac)

@@ -1,0 +1,48 @@
+{
+  "elasticnet": {
+    "mean_ic": 0.019972552813195727,
+    "mean_sharpe": -0.14596459920593743
+  },
+  "lightgbm": {
+    "mean_ic": 0.0016822656620061448
+  },
+  "go": true,
+  "reasoning": [
+    "ElasticNet mean IC (+0.0200) confirms real linear signal is present. SR is worth running specifically for the DECILE-BACKTEST SHARPE gain its nonlinearity has shown previously, not for IC improvement -- ElasticNet already gets ~the same IC far more cheaply."
+  ],
+  "consensus_feature_rank": {
+    "vwap": 0.8421052631578947,
+    "mean_close_5": 0.7105263157894737,
+    "sum_volume_20": 0.6842105263157894,
+    "sum_volume_5": 0.6578947368421053,
+    "ewma_close_20": 0.6578947368421053,
+    "delta_close_20": 0.631578947368421,
+    "ret_1d": 0.631578947368421,
+    "delta_close_10": 0.6052631578947368,
+    "mom_60": 0.5526315789473684,
+    "mean_close_10": 0.5526315789473684,
+    "sum_volume_10": 0.4473684210526315,
+    "delta_close_5": 0.4473684210526315,
+    "ewma_close_10": 0.42105263157894735,
+    "mean_close_20": 0.42105263157894735,
+    "std_close_20": 0.42105263157894735,
+    "ewma_close_5": 0.42105263157894735,
+    "std_close_5": 0.42105263157894735,
+    "std_close_10": 0.2631578947368421,
+    "corr_close_volume_10": 0.21052631578947367
+  },
+  "recommended_top_n": [
+    "vwap",
+    "mean_close_5",
+    "sum_volume_20",
+    "sum_volume_5",
+    "ewma_close_20",
+    "delta_close_20",
+    "ret_1d",
+    "delta_close_10",
+    "mom_60",
+    "mean_close_10",
+    "sum_volume_10",
+    "delta_close_5"
+  ]
+}

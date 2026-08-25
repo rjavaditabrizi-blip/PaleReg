@@ -31,6 +31,24 @@ ordinary minibatch SGD: any one evaluation only pays for `batch_days` worth
 of correlation math, but across thousands of evaluations over a run the
 search sees most of the actual training history, rather than being
 permanently restricted to one small slice chosen once at the start.
+
+Group-cache attempt (tried and reverted): the day->row-indices grouping only
+depends on dataset.weights, which is the same array object for every
+evaluation within one .fit() call, so caching it looked like a free win --
+build once, reuse across thousands of tree evaluations. Implemented with a
+global IdDict keyed by object identity and benchmarked on the same 480-day
+slice used to validate the rest of this module: it came back 60% SLOWER
+(367.6s vs. the uncached 230.1s baseline), not faster. Root cause: PySR runs
+with parallelism="multithreading" (multiple Julia threads evaluating trees
+concurrently), and Julia's base Dict/IdDict are not thread-safe for
+concurrent mutation -- multiple threads racing to populate the same shared
+mutable cache plausibly caused GC/synchronization contention that outweighed
+the saved rebuild work, and worse, risked silently incorrect results under
+a genuine data race, not just a performance loss. Reverted rather than ship
+something both slower and unsafe. A correct version of this idea would need
+either a per-thread cache or a proper lock, evaluated for net benefit before
+reuse -- not attempted here since the naive version already failed on speed
+grounds alone.
 """
 import numpy as np
 import pandas as pd

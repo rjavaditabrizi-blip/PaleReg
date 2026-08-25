@@ -32,6 +32,8 @@ from .combine import static_combine
 from .engines.pysr_engine import mine_pool_pysr_multiseed
 from .features import HORIZON
 from .fitness import mean_rank_ic
+from .folds import make_folds
+from .preflight import resolve_feature_subset
 from .train import mine_pool
 
 METHODS = {"decile": decile_backtest, "ic_weighted": ic_weighted_backtest}
@@ -39,21 +41,6 @@ METHODS = {"decile": decile_backtest, "ic_weighted": ic_weighted_backtest}
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 RESULTS_DIR = Path(__file__).resolve().parent.parent / "results"
 FEATURES_CACHE = DATA_DIR / "features.parquet"
-
-
-def make_folds(unique_dates: np.ndarray, n_folds: int, min_train_frac: float):
-    n = len(unique_dates)
-    min_train_end = int(n * min_train_frac)
-    fold_bounds = np.linspace(min_train_end, n, n_folds + 1).astype(int)
-    folds = []
-    for i in range(n_folds):
-        start_idx, end_idx = fold_bounds[i], fold_bounds[i + 1]
-        if start_idx >= end_idx or start_idx == 0:
-            continue
-        train_cutoff = unique_dates[start_idx - 1]
-        test_dates = unique_dates[start_idx:end_idx]
-        folds.append((train_cutoff, test_dates))
-    return folds
 
 
 def main():
@@ -98,6 +85,11 @@ def main():
     parser.add_argument("--sector-neutral", action="store_true", help="Form the backtest portfolio within each GICS sector")
     parser.add_argument("--n-buckets", type=int, default=10)
     parser.add_argument("--cost-bps", type=float, default=5.0)
+    parser.add_argument(
+        "--feature-subset", default=None,
+        help="'preflight' to use the last `python -m src.preflight --top-n N` recommendation, "
+        "or a comma-separated feature list. Default: use all features.",
+    )
     args = parser.parse_args()
 
     tag = args.tag if args.tag is not None else ("" if args.engine == "gplearn" else f"_{args.engine}")
@@ -110,6 +102,7 @@ def main():
         for c in df.columns
         if c not in {"date", "ticker", "sector", "open", "high", "low", "close", "volume", "fwd_ret", "fwd_ret_neutral"}
     ]
+    feature_cols = resolve_feature_subset(args.feature_subset, feature_cols)
     target_col = "fwd_ret" if args.target == "raw" else "fwd_ret_neutral"
     backtest_fn = METHODS[args.method]
     unique_dates = np.sort(df["date"].unique())

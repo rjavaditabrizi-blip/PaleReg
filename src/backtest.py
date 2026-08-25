@@ -35,6 +35,7 @@ def _periods_to_metrics(period_returns: list, period_long_only: list, horizon: i
         return {
             "n_periods": n_periods, "ann_return": float("nan"), "ann_vol": float("nan"),
             "sharpe": float("nan"), "long_only_ann_return": float("nan"), "equity_multiple": float("nan"),
+            "period_returns": list(period_returns),
         }
 
     period_returns = np.array(period_returns)
@@ -56,6 +57,7 @@ def _periods_to_metrics(period_returns: list, period_long_only: list, horizon: i
         "sharpe": float(sharpe),
         "long_only_ann_return": float(lo_ann_return),
         "equity_multiple": float(equity[-1]),
+        "period_returns": period_returns.tolist(),
     }
 
 
